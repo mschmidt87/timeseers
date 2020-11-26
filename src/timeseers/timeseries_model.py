@@ -7,24 +7,7 @@ from abc import ABC, abstractmethod
 
 class TimeSeriesModel(ABC):
     def fit(self, X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
-        if not X.index.is_monotonic_increasing:
-            raise ValueError('index of X is not monotonically increasing. You might want to call `.reset_index()`')
-
-        X_to_scale = X.select_dtypes(exclude='category')
-        self._X_scaler_ = X_scaler()
-        self._y_scaler_ = y_scaler()
-
-        X_scaled = self._X_scaler_.fit_transform(X_to_scale)
-        y_scaled = self._y_scaler_.fit_transform(y)
-        model = pm.Model()
-        X_scaled = X_scaled.join(X.select_dtypes('category'))
-        del X
-        mu = self.definition(
-            model, X_scaled, self._X_scaler_.scale_factor_
-        )
-        with model:
-            sigma = pm.HalfCauchy("sigma", 0.5)
-            pm.Normal("obs", mu=mu, sd=sigma, observed=y_scaled)
+        with self.__call__(X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
             self.trace_ = pm.sample(**sample_kwargs)
 
     def plot_components(self, X_true=None, y_true=None, groups=None, fig=None):
@@ -54,6 +37,28 @@ class TimeSeriesModel(ABC):
                 ax.scatter(X_true["t"], y_true, c="k", marker='.', alpha=0.2)
         fig.tight_layout()
         return fig
+
+    def __call__(self, X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
+        if not X.index.is_monotonic_increasing:
+            raise ValueError(
+                'index of X is not monotonically increasing. You might want to call `.reset_index()`')
+
+        X_to_scale = X.select_dtypes(exclude='category')
+        self._X_scaler_ = X_scaler()
+        self._y_scaler_ = y_scaler()
+
+        X_scaled = self._X_scaler_.fit_transform(X_to_scale)
+        y_scaled = self._y_scaler_.fit_transform(y)
+        model = pm.Model()
+        X_scaled = X_scaled.join(X.select_dtypes('category'))
+        del X
+        mu = self.definition(
+            model, X_scaled, self._X_scaler_.scale_factor_
+        )
+        with model:
+            sigma = pm.HalfCauchy("sigma", 0.5)
+            pm.Normal("obs", mu=mu, sd=sigma, observed=y_scaled)
+        return model
 
     @abstractmethod
     def plot(self, trace, t, y_scaler):
