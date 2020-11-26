@@ -13,7 +13,8 @@ class FourierSeasonality(TimeSeriesModel):
         period: pd.Timedelta = pd.Timedelta(days=365.25),
         shrinkage_strength=100,
         pool_cols=None,
-        pool_type='complete'
+        pool_type='complete',
+        likelihood='gaussian'
     ):
         self.n = n
         self.period = period
@@ -21,7 +22,7 @@ class FourierSeasonality(TimeSeriesModel):
         self.pool_cols = pool_cols
         self.pool_type = pool_type
         self.name = name or f"FourierSeasonality(period={self.period})"
-        super().__init__()
+        super().__init__(likelihood=likelihood)
 
     @staticmethod
     def _X_t(t, p=365.25, n=10):

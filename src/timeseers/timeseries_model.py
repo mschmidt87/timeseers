@@ -3,9 +3,12 @@ import pymc3 as pm
 from timeseers.utils import MinMaxScaler, StdScaler, add_subplot
 import numpy as np
 from abc import ABC, abstractmethod
-
+import theano.tensor as tt
 
 class TimeSeriesModel(ABC):
+    def __init__(self, likelihood='gaussian'):
+        self.likelihood = likelihood
+
     def fit(self, X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
         with self.__call__(X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
             self.trace_ = pm.sample(**sample_kwargs)
@@ -56,8 +59,12 @@ class TimeSeriesModel(ABC):
             model, X_scaled, self._X_scaler_.scale_factor_
         )
         with model:
-            sigma = pm.HalfCauchy("sigma", 0.5)
-            pm.Normal("obs", mu=mu, sd=sigma, observed=y_scaled)
+            if self.likelihood == 'gaussian':
+                sigma = pm.HalfCauchy("sigma", 0.5)
+                pm.Normal("obs", mu=mu, sd=sigma, observed=y_scaled)
+            elif self.likelihood == 'negative_binomial':
+                alpha = pm.HalfCauchy("alpha", 1.0)
+                pm.NegativeBinomial("obs", mu=tt.exp(mu), alpha=alpha, observed=y_scaled)
         return model
 
     @abstractmethod
@@ -85,7 +92,8 @@ class AdditiveTimeSeries(TimeSeriesModel):
     def __init__(self, left, right):
         self.left = left
         self.right = right
-        super().__init__()
+        assert self.left.likelihood == self.right.likelihood
+        super().__init__(likelihood=self.left.likelihood)
 
     def definition(self, *args, **kwargs):
         return self.left.definition(*args, **kwargs) + self.right.definition(
@@ -110,7 +118,8 @@ class MultiplicativeTimeSeries(TimeSeriesModel):
     def __init__(self, left, right):
         self.left = left
         self.right = right
-        super().__init__()
+        assert self.left.likelihood == self.right.likelihood
+        super().__init__(likelihood=self.left.likelihood)
 
     def definition(self, *args, **kwargs):
         return self.left.definition(*args, **kwargs) * (

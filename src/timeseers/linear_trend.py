@@ -7,7 +7,8 @@ import pymc3 as pm
 class LinearTrend(TimeSeriesModel):
     def __init__(
             self, name: str = None, n_changepoints=None, changepoints_prior_scale=0.05, growth_prior_scale=1,
-            pool_cols=None, pool_type='complete'
+            pool_cols=None, pool_type='complete',
+            likelihood='gaussian'
     ):
         self.n_changepoints = n_changepoints
         self.changepoints_prior_scale = changepoints_prior_scale
@@ -15,7 +16,7 @@ class LinearTrend(TimeSeriesModel):
         self.pool_cols = pool_cols
         self.pool_type = pool_type
         self.name = name or f"LinearTrend(n_changepoints={n_changepoints})"
-        super().__init__()
+        super().__init__(likelihood=likelihood)
 
     def definition(self, model, X, scale_factor):
         t = X["t"].values
