@@ -12,17 +12,20 @@ class FourierSeasonality(TimeSeriesModel):
         n: int = 10,
         period: pd.Timedelta = pd.Timedelta(days=365.25),
         shrinkage_strength=100,
+        beta_scale=1.,
         pool_cols=None,
         pool_type='complete',
-        likelihood='gaussian'
+        likelihood='gaussian',
+        variance_prior=0.5
     ):
         self.n = n
         self.period = period
         self.shrinkage_strength = shrinkage_strength
+        self.beta_scale = beta_scale
         self.pool_cols = pool_cols
         self.pool_type = pool_type
         self.name = name or f"FourierSeasonality(period={self.period})"
-        super().__init__(likelihood=likelihood)
+        super().__init__(likelihood=likelihood, variance_prior=variance_prior)
 
     @staticmethod
     def _X_t(t, p=365.25, n=10):
@@ -38,15 +41,16 @@ class FourierSeasonality(TimeSeriesModel):
         with model:
             if self.pool_type == 'partial':
 
-                mu_beta = pm.Normal(self._param_name("mu_beta"), mu=0, sigma=1, shape=n_params)  # TODO: add as parameters
+                mu_beta = pm.Normal(self._param_name("mu_beta"), mu=0, sigma=self.beta_scale, shape=n_params)  # TODO: add as parameters
                 sigma_beta = pm.HalfNormal(self._param_name("sigma_beta"), 0.1, shape=n_params)
                 offset_beta = pm.Normal(self._param_name("offset_beta"), 0, 1 / self.shrinkage_strength, shape=(n_groups, n_params))
 
                 beta = pm.Deterministic(self._param_name("beta"), mu_beta + offset_beta * sigma_beta)
             else:
-                beta = pm.Normal(self._param_name("beta"), 0, 1, shape=(n_groups, n_params))
+                beta = pm.Normal(self._param_name("beta"), 0, self.beta_scale, shape=(n_groups, n_params))
 
-            seasonality = pm.math.sum(self._X_t(t, self.p_, self.n) * beta[group], axis=1)
+            seasonality = pm.Deterministic(self._param_name('seasonality'),
+                                           pm.math.sum(self._X_t(t, self.p_, self.n) * beta[group], axis=1))
 
         return seasonality
 

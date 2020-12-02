@@ -6,8 +6,9 @@ from abc import ABC, abstractmethod
 import theano.tensor as tt
 
 class TimeSeriesModel(ABC):
-    def __init__(self, likelihood='gaussian'):
+    def __init__(self, likelihood='gaussian', variance_prior=0.5):
         self.likelihood = likelihood
+        self.variance_prior = variance_prior
 
     def fit(self, X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
         with self.__call__(X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
@@ -63,8 +64,12 @@ class TimeSeriesModel(ABC):
                 sigma = pm.HalfCauchy("sigma", 0.5)
                 pm.Normal("obs", mu=mu, sd=sigma, observed=y_scaled)
             elif self.likelihood == 'negative_binomial':
-                alpha = pm.HalfCauchy("alpha", 1.0)
-                pm.NegativeBinomial("obs", mu=tt.exp(mu), alpha=alpha, observed=y_scaled)
+                alpha = pm.HalfCauchy("alpha", self.variance_prior)
+                lam = pm.Deterministic('lambda', tt.exp(mu))
+                pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=y_scaled)
+            elif self.likelihood == 'poisson':
+                lam = pm.Deterministic('lambda', tt.exp(mu))
+                pm.Poisson ("obs", mu=lam, observed=y_scaled, testval=1.e6)
         return model
 
     @abstractmethod
