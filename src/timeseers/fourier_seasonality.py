@@ -24,7 +24,7 @@ class FourierSeasonality(TimeSeriesModel):
         self.beta_scale = beta_scale
         self.pool_cols = pool_cols
         self.pool_type = pool_type
-        self.name = name or f"FourierSeasonality(period={self.period})"
+        self.name = name or f"FourierSeasonality"
         super().__init__(likelihood=likelihood, variance_prior=variance_prior)
 
     @staticmethod

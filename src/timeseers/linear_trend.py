@@ -19,7 +19,7 @@ class LinearTrend(TimeSeriesModel):
         self.growth_prior_scale = growth_prior_scale
         self.pool_cols = pool_cols
         self.pool_type = pool_type
-        self.name = name or f"LinearTrend(n_changepoints={n_changepoints})"
+        self.name = name or f"LinearTrend"
         super().__init__(likelihood=likelihood, variance_prior=variance_prior)
 
     def definition(self, model, X, scale_factor):
