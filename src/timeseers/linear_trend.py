@@ -20,7 +20,8 @@ class LinearTrend(TimeSeriesModel):
         self.pool_cols = pool_cols
         self.pool_type = pool_type
         self.name = name or f"LinearTrend"
-        super().__init__(likelihood=likelihood, variance_prior=variance_prior)
+        super().__init__(likelihood=likelihood, variance_prior=variance_prior,
+                         pool_cols=self.pool_cols, pool_type=self.pool_type)
 
     def definition(self, model, X, scale_factor):
         t = X["t"].values
@@ -34,7 +35,9 @@ class LinearTrend(TimeSeriesModel):
                 if self.likelihood == 'gaussian':
                     sigma_k = pm.HalfCauchy(self._param_name('sigma_k'),
                                             beta=self.growth_prior_scale)
-                elif self.likelihood in ['negative_binomial', 'poisson']:
+                elif self.likelihood in ['negative_binomial', 'poisson',
+                                         'zeroinflated_negative_binomial',
+                                         'multi_outcome_negative_binomial']:
                     sigma_k = pm.Normal(self._param_name('sigma_k'),
                                         0, self.growth_prior_scale)
                 offset_k = pm.Normal(self._param_name('offset_k'), mu=0, sd=1, shape=n_groups)
@@ -43,7 +46,9 @@ class LinearTrend(TimeSeriesModel):
                 if self.likelihood == 'gaussian':
                     sigma_delta = pm.HalfCauchy(self._param_name('sigma_delta'),
                                                 beta=self.changepoints_prior_scale)
-                elif self.likelihood in ['negative_binomial', 'poisson']:
+                elif self.likelihood in ['negative_binomial', 'poisson',
+                                         'zeroinflated_negative_binomial',
+                                         'multi_outcome_negative_binomial']:
                     sigma_delta = pm.Normal(self._param_name('sigma_delta'),
                                             0, self.changepoints_prior_scale)
                 offset_delta = pm.Laplace(self._param_name('offset_delta'), 0, 1, shape=(n_groups, self.n_changepoints))

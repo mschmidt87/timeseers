@@ -25,7 +25,8 @@ class FourierSeasonality(TimeSeriesModel):
         self.pool_cols = pool_cols
         self.pool_type = pool_type
         self.name = name or f"FourierSeasonality"
-        super().__init__(likelihood=likelihood, variance_prior=variance_prior)
+        super().__init__(likelihood=likelihood, variance_prior=variance_prior,
+                         pool_cols=self.pool_cols, pool_type=self.pool_type)
 
     @staticmethod
     def _X_t(t, p=365.25, n=10):
@@ -42,7 +43,7 @@ class FourierSeasonality(TimeSeriesModel):
             if self.pool_type == 'partial':
 
                 mu_beta = pm.Normal(self._param_name("mu_beta"), mu=0, sigma=self.beta_scale, shape=n_params)  # TODO: add as parameters
-                sigma_beta = pm.HalfNormal(self._param_name("sigma_beta"), 0.1, shape=n_params)
+                sigma_beta = pm.HalfNormal(self._param_name("sigma_beta"), 1., shape=n_params)
                 offset_beta = pm.Normal(self._param_name("offset_beta"), 0, 1 / self.shrinkage_strength, shape=(n_groups, n_params))
 
                 beta = pm.Deterministic(self._param_name("beta"), mu_beta + offset_beta * sigma_beta)

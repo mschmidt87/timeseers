@@ -1,14 +1,16 @@
 import pandas as pd
 import pymc3 as pm
-from timeseers.utils import MinMaxScaler, StdScaler, add_subplot
+from timeseers.utils import MinMaxScaler, StdScaler, add_subplot, get_group_definition
 import numpy as np
 from abc import ABC, abstractmethod
 import theano.tensor as tt
 
 class TimeSeriesModel(ABC):
-    def __init__(self, likelihood='gaussian', variance_prior=0.5):
+    def __init__(self, likelihood='gaussian', variance_prior=0.5, pool_cols=None, pool_type='complete'):
         self.likelihood = likelihood
         self.variance_prior = variance_prior
+        self.pool_cols = pool_cols
+        self.pool_type = pool_type
 
     def fit(self, X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
         with self.__call__(X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
@@ -42,7 +44,7 @@ class TimeSeriesModel(ABC):
         fig.tight_layout()
         return fig
 
-    def __call__(self, X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, **sample_kwargs):
+    def __call__(self, X, y, X_scaler=MinMaxScaler, y_scaler=StdScaler, ppc=False):
         if not X.index.is_monotonic_increasing:
             raise ValueError(
                 'index of X is not monotonically increasing. You might want to call `.reset_index()`')
@@ -70,6 +72,27 @@ class TimeSeriesModel(ABC):
             elif self.likelihood == 'poisson':
                 lam = pm.Deterministic('lambda', tt.exp(mu))
                 pm.Poisson ("obs", mu=lam, observed=y_scaled, testval=1.e6)
+            elif self.likelihood == 'multi_outcome_negative_binomial':
+                lam = pm.Deterministic('lambda', tt.exp(mu))
+                alpha = pm.HalfCauchy("alpha", self.variance_prior)
+
+                group, n_groups, self.groups_ = get_group_definition(X_scaled, self.pool_cols,
+                                                                     self.pool_type)
+                idx = y_scaled[:, 0]
+                # if not isinstance(y_scaled, np.ndarray):
+                #     idx = idx.eval()
+                p = pm.Dirichlet('p', a=np.array([1., 1., 1.]), shape=(n_groups, 3))
+                pm.Categorical("obs_sign", p=p[group[idx]], observed=y_scaled[:, 2])
+                # if isinstance(y_scaled, np.ndarray):
+                idn0 = y_scaled[:, 1] != 0
+                # else:
+                #     idn0 = y_scaled[:, 1].eval() != 0
+                if ppc:
+                    idn0 = np.ones_like(y_scaled[:, 1], dtype=np.bool)
+                pm.NegativeBinomial("obs_abs_value", mu=lam[idx][idn0], alpha=alpha,
+                                    observed=y_scaled[:, 1][idn0],
+                                    total_size=len(X_scaled))
+
         return model
 
     @abstractmethod
@@ -98,7 +121,7 @@ class AdditiveTimeSeries(TimeSeriesModel):
         self.left = left
         self.right = right
         assert self.left.likelihood == self.right.likelihood
-        super().__init__(likelihood=self.left.likelihood)
+        super().__init__(likelihood=self.left.likelihood,)
 
     def definition(self, *args, **kwargs):
         return self.left.definition(*args, **kwargs) + self.right.definition(
