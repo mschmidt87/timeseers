@@ -49,8 +49,8 @@ class LinearTrend(TimeSeriesModel):
                 elif self.likelihood in ['negative_binomial', 'poisson',
                                          'zeroinflated_negative_binomial',
                                          'multi_outcome_negative_binomial']:
-                    sigma_delta = pm.Normal(self._param_name('sigma_delta'),
-                                            0, self.changepoints_prior_scale)
+                    sigma_delta = pm.HalfNormal(self._param_name('sigma_delta'),
+                                                self.changepoints_prior_scale)
                 offset_delta = pm.Laplace(self._param_name('offset_delta'), 0, 1, shape=(n_groups, self.n_changepoints))
                 delta = pm.Deterministic(self._param_name("delta"), offset_delta * sigma_delta)
 
